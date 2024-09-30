@@ -91,5 +91,5 @@ async def process_question(message: Message, state: FSMContext) -> None:
 
     admins = check_file('admins.json')
     admin_id = admins['Admin Id-number']
-    from app.main import bot
+    from main import bot
     await bot.send_message(admin_id, f"Нове запитання!\nВід: {user_name} (@{user_nickname})\nНомер телефону: {user_number}\nНадіслали о: {question_time}\nПитання: {question}")

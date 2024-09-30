@@ -19,7 +19,7 @@ class AdminStates(StatesGroup):
 
 @admin_router.message(Command('admin'))
 async def admin(message: Message, state: FSMContext) -> None:
-    if await is_admin(message.chat.id):
+    if is_admin(message.chat.id):
         btn1 = KeyboardButton(text='Редагувати послуги')
         btn2 = KeyboardButton(text='Редагувати "Про нас"')
         markup = ReplyKeyboardMarkup(keyboard=[[btn1, btn2]], resize_keyboard=True)

@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 def check_file(file):
-    path = Path('../mind_bot/json/' + file)
+    path = Path('json/' + file)
     if path.exists():
         with open(path, 'r', encoding='utf-8') as info:
             try:

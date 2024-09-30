@@ -77,7 +77,7 @@ async def edit_services(message: Message):
         for posluga in content:
             name = posluga["Name"]
             button = InlineKeyboardButton(text=name, callback_data=name)
-            buttons.append([button])
+            buttons.append(button)
         markup = InlineKeyboardMarkup(inline_keyboard=buttons)
 
         await message.answer("Щоб редагувати якісь з вже існуючих послуг, оберіть із запропонованих:", reply_markup=markup)

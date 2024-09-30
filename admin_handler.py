@@ -72,12 +72,14 @@ async def edit_services(message: Message):
         btn2 = KeyboardButton(text="Видалити послугу")
         btn3 = KeyboardButton(text="Повернутися")
         markup1 = ReplyKeyboardMarkup(keyboard=[[btn1, btn2], [btn3]], resize_keyboard=True)
+
         content = check_file('services.json')
         for posluga in content:
             name = posluga["Name"]
             button = InlineKeyboardButton(text=name, callback_data=name)
-            buttons.append(button)
-        markup = InlineKeyboardMarkup(inline_keyboard=buttons) 
+            buttons.append([button])
+        markup = InlineKeyboardMarkup(inline_keyboard=buttons)
+
         await message.answer("Щоб редагувати якісь з вже існуючих послуг, оберіть із запропонованих:", reply_markup=markup)
         await message.answer("Для того щоб додати нову послугу або видалити якусь із існуючих, оберіть необхідну дію тут:", reply_markup=markup1)
 

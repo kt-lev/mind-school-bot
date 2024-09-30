@@ -2,8 +2,8 @@ import asyncio
 from aiogram import Bot, Dispatcher, F
 from aiogram.fsm.storage.memory import MemoryStorage
 import os
-from admin_handler import admin_router
-from user_handler import user_router
+from app.admin_handler import admin_router
+from app.user_handler import user_router
 
 #bot = Bot(token=f'{os.getenv('API_Token')}')
 bot = Bot(token='7239649070:AAEVL4Hllh8rKLsmfMBHLYY6lUItt_KBTHY')

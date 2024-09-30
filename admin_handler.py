@@ -64,49 +64,54 @@ async def select_service(call: CallbackQuery, state: FSMContext):
             await call.message.answer(text=f"Ви обрали послугу: {context.get('Name')}", reply_markup=markup)
             break
 
-@admin_router.message(F.text == 'Редагувати послуги', F.chat.id.func(is_admin))
+@admin_router.message(F.text == 'Редагувати послуги')
 async def edit_services(message: Message):
-    buttons = []
-    btn1 = KeyboardButton(text="Додати послугу")
-    btn2 = KeyboardButton(text="Видалити послугу")
-    btn3 = KeyboardButton(text="Повернутися")
-    markup1 = ReplyKeyboardMarkup(keyboard=[[btn1, btn2], [btn3]], resize_keyboard=True)
-    content = check_file('services.json')
-    for posluga in content:
-        name = posluga["Name"]
-        button = InlineKeyboardButton(text=name, callback_data=name)
-        buttons.append(button)
-    markup = InlineKeyboardMarkup(inline_keyboard=buttons) 
-    await message.answer("Щоб редагувати якісь з вже існуючих послуг, оберіть із запропонованих:", reply_markup=markup)
-    await message.answer("Для того щоб додати нову послугу або видалити якусь із існуючих, оберіть необхідну дію тут:", reply_markup=markup1)
+    if is_admin(message.chat.id):
+        buttons = []
+        btn1 = KeyboardButton(text="Додати послугу")
+        btn2 = KeyboardButton(text="Видалити послугу")
+        btn3 = KeyboardButton(text="Повернутися")
+        markup1 = ReplyKeyboardMarkup(keyboard=[[btn1, btn2], [btn3]], resize_keyboard=True)
+        content = check_file('services.json')
+        for posluga in content:
+            name = posluga["Name"]
+            button = InlineKeyboardButton(text=name, callback_data=name)
+            buttons.append(button)
+        markup = InlineKeyboardMarkup(inline_keyboard=buttons) 
+        await message.answer("Щоб редагувати якісь з вже існуючих послуг, оберіть із запропонованих:", reply_markup=markup)
+        await message.answer("Для того щоб додати нову послугу або видалити якусь із існуючих, оберіть необхідну дію тут:", reply_markup=markup1)
 
-@admin_router.message(F.text == 'Редагувати "Про нас"', F.chat.id.func(is_admin))
+@admin_router.message(F.text == 'Редагувати "Про нас"')
 async def menu_edit_about_us(message: Message):
-    buttons = []
-    about_us = check_file('about_us.json')
-    for key in about_us.keys():
-        button = InlineKeyboardButton(text=key, callback_data=key)
-        buttons.append([button])
-    markup = InlineKeyboardMarkup(inline_keyboard=buttons)
-    await message.answer("Виберіть, що саме ви хочете редагувати:", reply_markup=markup)
+    if is_admin(message.chat.id):
+        buttons = []
+        about_us = check_file('about_us.json')
+        for key in about_us.keys():
+            button = InlineKeyboardButton(text=key, callback_data=key)
+            buttons.append([button])
+        markup = InlineKeyboardMarkup(inline_keyboard=buttons)
+        await message.answer("Виберіть, що саме ви хочете редагувати:", reply_markup=markup)
 
-@admin_router.message(F.text == 'Повернутися', F.chat.id.func(is_admin))
+@admin_router.message(F.text == 'Повернутися')
 async def back_to_menu(message: Message, state: FSMContext):
-    menu_state = (await state.get_data()).get('menu_state')
-    if menu_state:
-        await message.answer('Ви повернулися в головне меню!', reply_markup=menu_state)
-    else:
-        await message.answer('Помилка повернення до головного меню!')
+    if is_admin(message.chat.id):
+        menu_state = (await state.get_data()).get('menu_state')
+        if menu_state:
+            await message.answer('Ви повернулися в головне меню!', reply_markup=menu_state)
+        else:
+            await message.answer('Помилка повернення до головного меню!')
 
-@admin_router.message(F.text == 'Додати послугу', F.chat.id.func(is_admin))
+@admin_router.message(F.text == 'Додати послугу')
 async def add_service(message: Message, state: FSMContext):
-    await message.answer("Введіть назву нової послуги:")
-    await state.set_state(AdminStates.waiting_for_new_posluga_name)
+    if is_admin(message.chat.id):
+        await message.answer("Введіть назву нової послуги:")
+        await state.set_state(AdminStates.waiting_for_new_posluga_name)
 
-@admin_router.message(F.text == 'Видалити послугу', F.chat.id.func(is_admin))
+@admin_router.message(F.text == 'Видалити послугу')
 async def delete_service(message: Message, state: FSMContext):
-    await message.answer("Введіть назву послуги, яку хочете видалити:")
-    await state.set_state(AdminStates.waiting_for_delete_posluga_name)
+    if is_admin(message.chat.id):
+        await message.answer("Введіть назву послуги, яку хочете видалити:")
+        await state.set_state(AdminStates.waiting_for_delete_posluga_name)
 
 @admin_router.message(AdminStates.waiting_for_posluga_name)
 async def edit_service_name(message: Message, state: FSMContext):

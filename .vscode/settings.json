@@ -1,0 +1,10 @@
+{
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "driver": "SQLite",
+            "name": "admin",
+            "database": "${workspaceFolder:mind_bot}/db/database.db"
+        }
+    ]
+}

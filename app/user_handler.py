@@ -4,11 +4,13 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from datetime import datetime
-import pytz, json
-from pathlib import Path
-from utils import check_file
+import pytz
+import sqlite3
 
 user_router = Router()
+
+conn = sqlite3.connect('db/database.db')
+cursor = conn.cursor()
 
 class UserStates(StatesGroup):
     waiting_for_name = State()
@@ -25,23 +27,25 @@ async def start(message: Message) -> None:
 
 @user_router.message(F.text == "Напрямки та послуги центру розвитку")
 async def show_services(message: Message) -> None:
-    content = check_file('services.json')
+    cursor.execute("SELECT Name, Url FROM services")
+    services = cursor.fetchall()
     buttons = []
-    for posluga in content:
-        button = [InlineKeyboardButton(text=posluga["Name"], url=posluga["Url"])]
+    for service in services:
+        button = [InlineKeyboardButton(text=service[0], url=service[1])]
         buttons.append(button)
     markup = InlineKeyboardMarkup(inline_keyboard=buttons)
     await message.answer("Ось наші послуги, натисніть на те, що зацікавило, щоб дізнатися більше", reply_markup=markup)
 
 @user_router.message(F.text == "Про нас")
 async def show_about_us(message: Message) -> None:
-    about_us = check_file('about_us.json')
+    cursor.execute("SELECT description, schedule, contact_num, link_on_website, address, link_on_google_maps FROM about_us WHERE id =1")
+    about_us = cursor.fetchone()
     about_us_text = (
-        f"{about_us['Опис']}\n\n"
-        f"Години роботи:\n{about_us['Години роботи']}\n\n"
-        f"Контакти: {about_us['Контакти']}\n\n"
-        f"Наш веб-сайт: {about_us['Посилання на вебсайт']}\n\n"
-        f"Адреса: [{about_us['Адреса']}]({about_us['Посилання на Google Maps']})"
+        f"{about_us[0]}\n\n"
+        f"Години роботи:\n{about_us[1]}\n\n"
+        f"Контакти: {about_us[2]}\n\n"
+        f"Наш веб-сайт: {about_us[3]}\n\n"
+        f"Адреса: [{about_us[4]}]({about_us[5]})"
     )
     await message.answer(about_us_text, parse_mode='Markdown')
     await message.answer_location(latitude=50.36134631320339, longitude=30.407647045843753)
@@ -72,24 +76,13 @@ async def process_question(message: Message, state: FSMContext) -> None:
     user_nickname = message.from_user.username
     question_time = datetime.now(pytz.timezone("Europe/Kiev")).strftime("%d.%m.%Y %H:%M:%S")
 
-    data = check_file('questions.json')
-    person = {
-        "Name": user_name,
-        "Number": user_number,
-        "Question": question,
-        "Username": user_nickname,
-        "Time": question_time
-    }
-    data.append(person)
-
-    questions_path = Path('../mind_bot/json/questions.json')
-    with open(questions_path, 'w', encoding='utf-8') as in_questions:
-        json.dump(data, in_questions, ensure_ascii=False, indent=4)
+    cursor.execute("INSERT INTO questions (Name, Number, Question, Username, Time) VALUES (?, ?, ?, ?, ?)", (user_name, user_number, question, user_nickname, question_time))
+    conn.commit()
 
     await message.answer("Дякую за ваше питання! Ми з вами зв'яжемося найближчим часом.")
     await state.clear()
 
-    admins = check_file('admins.json')
-    admin_id = admins['Admin Id-number']
-    from main import bot
+    cursor.execute("SELECT tg_id FROM admins WHERE id = 1")
+    admin_id = cursor.fetchone()[0]
+    from app.main import bot
     await bot.send_message(admin_id, f"Нове запитання!\nВід: {user_name} (@{user_nickname})\nНомер телефону: {user_number}\nНадіслали о: {question_time}\nПитання: {question}")

@@ -3,9 +3,8 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardB
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-import json
-from pathlib import Path
-from utils import check_file, is_admin
+import sqlite3
+from utils import is_admin
 
 admin_router = Router()
 
@@ -16,6 +15,9 @@ class AdminStates(StatesGroup):
     waiting_for_new_posluga_name = State()
     waiting_for_new_posluga_url = State()
     waiting_for_delete_posluga_name = State()
+
+conn = sqlite3.connect('db/database.db')
+cursor = conn.cursor()
 
 @admin_router.message(Command('admin'))
 async def admin(message: Message, state: FSMContext) -> None:
@@ -38,58 +40,67 @@ async def callback_edit_service_description(call: CallbackQuery, state: FSMConte
     await call.message.answer("Вставте нове URL-посилання на описову сторінку:")
     await state.set_state(AdminStates.waiting_for_posluga_description)
 
-@admin_router.callback_query(F.data.in_({"Опис", "Години роботи", "Адреса", "Контакти", "Посилання на вебсайт", "Посилання на Google Maps"}))
+@admin_router.callback_query(F.data.in_({"Опис", "Години роботи", "Адресу", "Контакти", "Посилання на вебсайт", "Посилання на Google Maps"}))
 async def edit_about_us_field(call: CallbackQuery, state: FSMContext):
+    fields = {
+        "Опис": "description",
+        "Години роботи": "schedule",
+        "Адресу": "address",
+        "Контакти": "contact_num",
+        "Посилання на вебсайт": "link_on_website",
+        "Посилання на Google Maps": "link_on_google_maps"
+    }
     field_prompts = {
         "Опис": "Введіть новий опис:",
         "Години роботи": "Введіть новий час роботи:",
-        "Адреса": "Введіть нову адресу:",
+        "Адресу": "Введіть нову адресу:",
         "Контакти": "Введіть нові контакти:",
         "Посилання на вебсайт": "Введіть новий вебсайт:",
         "Посилання на Google Maps": "Введіть нове посилання на Google Maps:"
     }
     await call.message.answer(text=f"{field_prompts[call.data]}")
-    await state.update_data(field=call.data)
+    await state.update_data(field=f"{fields[call.data]}")
     await state.set_state(AdminStates.waiting_for_about_us)
 
 @admin_router.callback_query(F.data)
 async def select_service(call: CallbackQuery, state: FSMContext):
-    data = check_file('services.json')
-    for context in data:
-        if call.data == context["Name"]:
-            await state.update_data(flag_name=call.data)
-            btn1 = InlineKeyboardButton(text="Змінити назву", callback_data="rename")
-            btn2 = InlineKeyboardButton(text="Змінити опис", callback_data="rewrite")
-            markup = InlineKeyboardMarkup(inline_keyboard=[[btn1, btn2]])
-            await call.message.answer(text=f"Ви обрали послугу: {context.get('Name')}", reply_markup=markup)
-            break
+    id = int(call.data)
+    cursor.execute(f"SELECT Name FROM services WHERE Id = {id}")
+    name = cursor.fetchone()
+    await state.update_data(flag_id=id)
+    btn1 = InlineKeyboardButton(text="Змінити назву", callback_data="rename")
+    btn2 = InlineKeyboardButton(text="Змінити опис", callback_data="rewrite")
+    markup = InlineKeyboardMarkup(inline_keyboard=[[btn1, btn2]])
+    await call.message.answer(text=f"Ви обрали послугу: {name[0]}", reply_markup=markup)
 
 @admin_router.message(F.text == 'Редагувати послуги')
 async def edit_services(message: Message):
     if is_admin(message.chat.id):
-        buttons = []
         btn1 = KeyboardButton(text="Додати послугу")
         btn2 = KeyboardButton(text="Видалити послугу")
         btn3 = KeyboardButton(text="Повернутися")
         markup1 = ReplyKeyboardMarkup(keyboard=[[btn1, btn2], [btn3]], resize_keyboard=True)
 
-        content = check_file('services.json')
-        for posluga in content:
-            name = posluga["Name"]
-            button = InlineKeyboardButton(text=name, callback_data=name)
-            buttons.append(button)
+        cursor.execute("SELECT * FROM services")
+        data = cursor.fetchall()
+        buttons = []
+        for posluga in data:
+            name = posluga[1]
+            id = posluga[0]
+            button = InlineKeyboardButton(text=name, callback_data=str(id))
+            buttons.append([button])
         markup = InlineKeyboardMarkup(inline_keyboard=buttons)
 
         await message.answer("Щоб редагувати якісь з вже існуючих послуг, оберіть із запропонованих:", reply_markup=markup)
         await message.answer("Для того щоб додати нову послугу або видалити якусь із існуючих, оберіть необхідну дію тут:", reply_markup=markup1)
 
-@admin_router.message(F.text == 'Редагувати "Про нас"')
+@admin_router .message(F.text == 'Редагувати "Про нас"')
 async def menu_edit_about_us(message: Message):
     if is_admin(message.chat.id):
         buttons = []
-        about_us = check_file('about_us.json')
-        for key in about_us.keys():
-            button = InlineKeyboardButton(text=key, callback_data=key)
+        about_us = ["Опис", "Години роботи", "Адресу", "Контакти", "Посилання на вебсайт", "Посилання на Google Maps"]
+        for field in about_us:
+            button = InlineKeyboardButton(text=f"Редагувати {field}", callback_data=field)
             buttons.append([button])
         markup = InlineKeyboardMarkup(inline_keyboard=buttons)
         await message.answer("Виберіть, що саме ви хочете редагувати:", reply_markup=markup)
@@ -97,7 +108,7 @@ async def menu_edit_about_us(message: Message):
 @admin_router.message(F.text == 'Повернутися')
 async def back_to_menu(message: Message, state: FSMContext):
     if is_admin(message.chat.id):
-        menu_state = (await state.get_data()).get('menu_state')
+        menu_state = (await state.get_data())['menu_state']
         if menu_state:
             await message.answer('Ви повернулися в головне меню!', reply_markup=menu_state)
         else:
@@ -117,81 +128,57 @@ async def delete_service(message: Message, state: FSMContext):
 
 @admin_router.message(AdminStates.waiting_for_posluga_name)
 async def edit_service_name(message: Message, state: FSMContext):
-    data = check_file('services.json')
     state_data = await state.get_data()
-    flag_name = state_data.get('flag_name')
-    for context in data:
-        if context["Name"] == flag_name:
-            context["Name"] = message.text
-    services_path = Path('../mind_bot/json/services.json')
-    with open(services_path, 'w', encoding='utf-8') as file:
-        json.dump(data, file, ensure_ascii=False, indent=4)
+    flag_id = state_data.get('flag_id')
+    cursor.execute("UPDATE services SET Name = ? WHERE Id = ?", (message.text, flag_id))
+    conn.commit()
     await message.answer(f"Назву успішно змінено на: {message.text}!")
-    await state.clear()
+    
 
 @admin_router.message(AdminStates.waiting_for_posluga_description)
 async def edit_service_description(message: Message, state: FSMContext):
-    data = check_file('services.json')
     state_data = await state.get_data()
-    flag_name = state_data.get('flag_name')
-    for context in data:
-        if context["Name"] == flag_name:
-            context["Url"] = message.text
-    services_path = Path('../mind_bot/json/services.json')
-    with open(services_path, 'w', encoding='utf-8') as file:
-        json.dump(data, file, ensure_ascii=False, indent=4)
+    flag_id = state_data.get('flag_id')
+    cursor.execute("UPDATE services SET Url = ? WHERE Id = ?", (message.text, flag_id))
+    conn.commit()
     await message.answer(f"Опис успішно змінено на: {message.text}")
-    await state.clear()
+    
 
 @admin_router.message(AdminStates.waiting_for_about_us)
 async def edit_about_us(message: Message, state: FSMContext):
     state_data = await state.get_data()
     field_about_us = state_data.get('field')
-    about_us = check_file('about_us.json')
-    about_us[field_about_us] = message.text 
-    about_us_path = Path('../mind_bot/json/about_us.json')
-    with open(about_us_path, 'w', encoding='utf-8') as file:
-        json.dump(about_us, file, ensure_ascii=False, indent=4)
+    cursor.execute(f"UPDATE about_us SET {field_about_us} = ? WHERE id = 1", (message.text,))
+    conn.commit()
     field_name = {
-        "Опис": "Опис",
-        "Години роботи": "Години роботи",
-        "Адреса": "Адресу",
-        "Контакти": "Контакти",
-        "Посилання на вебсайт": "Посилання на вебсайт",
-        "Посилання на Google Maps": "Посилання на Google Maps"
-    }[field_about_us]
-    await message.answer(f"{field_name} змінено на: {message.text}!")
-    await state.clear()
+        "description": "Опис",
+        "schedule": "Години роботи",
+        "address": "Адресу",
+        "contact_num": "Контакти",
+        "link_on_website": "Посилання на вебсайт",
+        "link_on_google_maps": "Посилання на Google Maps"
+    }
+    await message.answer(f"{field_name[field_about_us]} успішно змінено на: {message.text}")
+    
 
 @admin_router.message(AdminStates.waiting_for_new_posluga_name)
-async def new_service_name(message: Message, state: FSMContext):
-    await message.answer("Вставте URL опису послуги:")
-    await state.update_data(name=message.text)
+async def add_new_service_name(message: Message, state: FSMContext):
+    await message.answer("Введіть URL-посилання на описову сторінку послуги:")
+    await state.update_data(new_posluga_name=message.text)
     await state.set_state(AdminStates.waiting_for_new_posluga_url)
 
 @admin_router.message(AdminStates.waiting_for_new_posluga_url)
-async def new_service_url(message: Message, state: FSMContext):
-    data = check_file('services.json')
+async def add_new_service_url(message: Message, state: FSMContext):
     state_data = await state.get_data()
-    name = state_data.get('name')
-    data.append({"Name": name, "Url": message.text})
-    services_path = Path('../mind_bot/json/services.json')
-    with open(services_path, 'w', encoding='utf-8') as file:
-        json.dump(data, file, ensure_ascii=False, indent=4)
-    await message.answer(f"Нову послугу '{name}' успішно додано!")
-    await state.clear()
+    new_posluga_name = state_data.get('new_posluga_name')
+    cursor.execute("INSERT INTO services (Name, Url) VALUES (?, ?)", (new_posluga_name, message.text))
+    conn.commit()
+    await message.answer(f"Послуга '{new_posluga_name}' успішно додана!")
+    
 
 @admin_router.message(AdminStates.waiting_for_delete_posluga_name)
 async def delete_service_name(message: Message, state: FSMContext):
-    data = check_file('services.json')
-    for context in data:
-        if context["Name"] == message.text:
-            data.remove(context)
-            services_path = Path('../mind_bot/json/services.json')
-            with open(services_path, 'w', encoding='utf-8') as file:
-                json.dump(data, file, ensure_ascii=False, indent=4)
-            await message.answer(f"Послугу '{message.text}' успішно видалено!")
-            break
-    else:
-        await message.answer(f"Послугу з назвою '{message.text}' не знайдено!")
-    await state.clear()
+    cursor.execute("DELETE FROM services WHERE Name = ?", (message.text))
+    conn.commit()
+    await message.answer(f"Послуга '{message.text}' успішно видалена!")
+    

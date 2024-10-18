@@ -5,8 +5,7 @@ import os
 from admin_handler import admin_router
 from user_handler import user_router
 
-#bot = Bot(token=f'{os.getenv('API_Token')}')
-bot = Bot(token='7239649070:AAEVL4Hllh8rKLsmfMBHLYY6lUItt_KBTHY')
+bot = Bot(token=f'{os.getenv('API_Token')}')
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
